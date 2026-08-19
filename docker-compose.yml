@@ -1,0 +1,97 @@
+# =============================================================================
+# SHEIN India public coupon discovery & validation service
+#
+#   cp .env.example .env      # then set MONGODB_URL
+#   docker compose up --build
+#   Ctrl+C                    # graceful shutdown + final report
+#   docker compose down       # keeps the MongoDB volume
+#   docker compose down -v    # ALSO deletes the MongoDB volume (history lost)
+#
+# Two supported configurations:
+#   1. Local MongoDB  -> MONGODB_URL=mongodb://mongodb:27017  (the `mongodb`
+#                        service below is used, data persisted in a volume)
+#   2. External Mongo -> MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/
+#                        The app connects straight to it. The local container is
+#                        then unnecessary: `docker compose up --build --no-deps app`
+# =============================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: shein-coupon-finder:latest
+    container_name: shein-coupon-finder
+    # Reap zombie Chromium processes and forward signals correctly.
+    init: true
+    # Restart on crashes, but never fight an intentional stop.
+    restart: on-failure
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    environment:
+      # --- MongoDB (values come from ./.env, defaults shown after ":-") ------
+      MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:27017}
+      MONGODB_DB: ${MONGODB_DB:-shein_coupon_finder}
+      # --- Scheduling -------------------------------------------------------
+      SCAN_INTERVAL_MINUTES: ${SCAN_INTERVAL_MINUTES:-30}
+      VALIDATION_INTERVAL_MINUTES: ${VALIDATION_INTERVAL_MINUTES:-60}
+      # --- Request safety ---------------------------------------------------
+      MAX_CONCURRENT_REQUESTS: ${MAX_CONCURRENT_REQUESTS:-3}
+      REQUEST_DELAY_MS: ${REQUEST_DELAY_MS:-2000}
+      REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-20000}
+      MAX_RETRIES: ${MAX_RETRIES:-2}
+      USER_AGENT: ${USER_AGENT:-}
+      # --- Target offer -----------------------------------------------------
+      TARGET_CART_VALUE: ${TARGET_CART_VALUE:-1000}
+      TARGET_DISCOUNT: ${TARGET_DISCOUNT:-800}
+      # --- Freshness --------------------------------------------------------
+      REVALIDATE_VALID_AFTER_HOURS: ${REVALIDATE_VALID_AFTER_HOURS:-24}
+      REVALIDATE_UNVERIFIED_AFTER_HOURS: ${REVALIDATE_UNVERIFIED_AFTER_HOURS:-6}
+      REVALIDATE_INVALID_AFTER_HOURS: ${REVALIDATE_INVALID_AFTER_HOURS:-72}
+      STALE_SOURCE_AFTER_DAYS: ${STALE_SOURCE_AFTER_DAYS:-30}
+      # --- Browser / validation --------------------------------------------
+      HEADLESS: ${HEADLESS:-true}
+      BROWSER_TIMEOUT_MS: ${BROWSER_TIMEOUT_MS:-45000}
+      ENABLE_CART_VALIDATION: ${ENABLE_CART_VALIDATION:-true}
+      MAX_CART_VALIDATIONS_PER_CYCLE: ${MAX_CART_VALIDATIONS_PER_CYCLE:-5}
+      # --- Limits / runtime -------------------------------------------------
+      MAX_CANDIDATES_PER_COLLECTOR: ${MAX_CANDIDATES_PER_COLLECTOR:-60}
+      MAX_VALIDATIONS_PER_CYCLE: ${MAX_VALIDATIONS_PER_CYCLE:-40}
+      RUN_ONCE: ${RUN_ONCE:-false}
+      REPORT_ONLY: ${REPORT_ONLY:-false}
+      RESULTS_DIR: ${RESULTS_DIR:-/app/results}
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-25000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: ${NODE_ENV:-production}
+      TZ: ${TZ:-Asia/Kolkata}
+    volumes:
+      # Reports are written here, readable from the host after shutdown.
+      - ./results:/app/results
+    # Give the graceful-shutdown sequence room to finish before SIGKILL.
+    stop_grace_period: 30s
+    # Chromium needs more than the default 64MB of shared memory.
+    shm_size: 512m
+
+  mongodb:
+    image: mongo:8
+    container_name: shein-coupon-mongodb
+    restart: unless-stopped
+    command: ["--bind_ip_all"]
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGODB_DB:-shein_coupon_finder}
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    # Uncomment to inspect the database from the host with a Mongo client.
+    # ports:
+    #   - "27017:27017"
+
+volumes:
+  mongodb_data:
+    name: shein_coupon_mongodb_data
