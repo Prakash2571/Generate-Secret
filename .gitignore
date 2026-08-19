@@ -1,0 +1,22 @@
+# Never commit real credentials
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Generated reports (directory itself is kept via results/.gitkeep)
+results/*
+!results/.gitkeep
+
+logs/
+*.log
+npm-debug.log*
+coverage/
+.DS_Store
+.idea/
+.vscode/
+playwright-report/
+test-results/
