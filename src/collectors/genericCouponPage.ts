@@ -38,6 +38,9 @@ export async function fetchPageCandidates(options: PageFetchOptions): Promise<Co
     });
 
   let candidates: CouponCandidate[] = [];
+  let via = 'http';
+
+  logger.tag('FETCH', `${sourceName}: requesting ${url}`);
 
   const html = await httpClient.getText(url, { signal: context.signal });
   if (html) {
@@ -58,14 +61,9 @@ export async function fetchPageCandidates(options: PageFetchOptions): Promise<Co
       waitForSelector: options.waitForSelector,
     });
     if (rendered) {
+      via = 'chromium';
       try {
         candidates = extract(rendered);
-        if (candidates.length > 0) {
-          logger.debug('candidates recovered via browser render', {
-            url,
-            count: candidates.length,
-          });
-        }
       } catch (error) {
         logger.warn('extraction failed on rendered page', {
           url,
@@ -74,6 +72,13 @@ export async function fetchPageCandidates(options: PageFetchOptions): Promise<Co
       }
     }
   }
+
+  logger.tag(
+    'FETCH',
+    `${sourceName}: ${candidates.length} candidate offers from ${url}`,
+    { via, withCodes: candidates.filter((candidate) => candidate.code).length },
+    candidates.length > 0 ? 'info' : 'debug',
+  );
 
   return candidates;
 }
@@ -104,6 +109,7 @@ export function createCouponSiteCollector(spec: CouponSiteSpec): Collector {
 
     async collect(context: CollectorContext): Promise<CouponCandidate[]> {
       const collected: CouponCandidate[] = [];
+      logger.tag('COLLECT', `${spec.name}: scanning ${spec.urls.length} page(s)`);
 
       for (const url of spec.urls) {
         if (context.signal.aborted) break;
@@ -119,7 +125,6 @@ export function createCouponSiteCollector(spec: CouponSiteSpec): Collector {
           waitForSelector: spec.waitForSelector,
         });
 
-        logger.debug('page scanned', { collector: spec.name, url, found: candidates.length });
         collected.push(...candidates);
       }
 

@@ -31,6 +31,9 @@ export async function renderPage(url: string, options: RenderOptions = {}): Prom
     return null;
   }
 
+  // Rendering is much slower than a plain fetch, so say so.
+  logger.info('rendering page with chromium', { url });
+
   try {
     return await browserManager.withPage(async (page) => {
       await browserManager.goto(page, url, 'domcontentloaded');

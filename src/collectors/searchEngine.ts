@@ -45,7 +45,7 @@ export const searchEngineCollector: Collector = {
     for (const query of queries) {
       if (context.signal.aborted) break;
       const results = await runSearch(query, context);
-      logger.debug('search executed', { query, results: results.length });
+      logger.tag('SEARCH', `"${query}" -> ${results.length} results`);
       hits.push(...results);
     }
 

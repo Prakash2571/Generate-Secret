@@ -87,6 +87,18 @@ export async function runDiscovery(signal: AbortSignal): Promise<DiscoveryStats>
     from: allCandidates.length,
   });
 
+  // An empty scan is usually an environment problem, not an absence of offers.
+  // Say why, instead of leaving the operator staring at an empty table.
+  if (candidates.length === 0) {
+    logger.warn('no candidate offers were extracted from any source this cycle', {
+      failingCollectors: failedCollectors.length > 0 ? failedCollectors.join(',') : 'none',
+      likelyCauses:
+        'outbound HTTPS blocked; sources answered 403/anti-bot; robots.txt disallowed them; ' +
+        'or no search key set (BRAVE_SEARCH_API_KEY / SERPAPI_KEY)',
+      tip: 'set LOG_LEVEL=debug to see every request',
+    });
+  }
+
   let newCoupons = 0;
   let updatedCoupons = 0;
   let changedCoupons = 0;

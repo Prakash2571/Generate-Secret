@@ -107,7 +107,8 @@ export class HttpClient {
         logger.info('skipping source disallowed by robots.txt', { url });
         return null;
       }
-      logger.debug('http get failed', { url, reason: describeError(error) });
+      // Visible at the default log level: a silent scan looks like a broken one.
+      logger.warn('http get failed', { url, reason: describeError(error) });
       return null;
     }
   }

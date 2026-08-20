@@ -44,6 +44,8 @@ export const officialSheinCollector: Collector = {
     const queue = [...OFFICIAL_URLS];
     let discoveredLinks = 0;
 
+    logger.tag('COLLECT', `officialShein: scanning ${queue.length} official page(s)`);
+
     while (queue.length > 0) {
       if (context.signal.aborted) break;
       if (collected.length >= context.maxCandidates) break;
@@ -64,7 +66,7 @@ export const officialSheinCollector: Collector = {
           pageIsAboutShein: true,
           maxCandidates: context.maxCandidates,
         });
-        logger.debug('official page scanned', { url, found: candidates.length });
+        logger.tag('FETCH', `officialShein: ${candidates.length} candidate offers from ${url}`);
         collected.push(...candidates);
       } catch (error) {
         logger.warn('official page extraction failed', { url, reason: describeError(error) });
@@ -87,6 +89,7 @@ export const officialSheinCollector: Collector = {
 
 /** Plain HTTP first, Chromium second (SHEIN renders offers client-side). */
 async function loadOfficialPage(url: string, context: CollectorContext): Promise<string | null> {
+  logger.tag('FETCH', `officialShein: requesting ${url}`);
   const direct = await httpClient.getText(url, { signal: context.signal });
   if (direct && /coupon|discount|% off|\u20b9/i.test(direct)) return direct;
 
