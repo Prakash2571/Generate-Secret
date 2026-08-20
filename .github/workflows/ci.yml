@@ -23,12 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `cache: npm` here: dependency caching requires a committed lockfile.
+      # Once package-lock.json is committed, add `cache: npm` below and switch
+      # the install step to `npm ci`.
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
 
-      # No lockfile is committed, so `npm ci` is not applicable.
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
