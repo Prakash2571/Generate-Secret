@@ -1,6 +1,10 @@
 node_modules
 dist
+dist-test
 results
+tests
+tsconfig.test.json
+.github
 .git
 .gitignore
 .env

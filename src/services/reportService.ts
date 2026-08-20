@@ -31,9 +31,17 @@ const STATUS_ORDER: CouponStatus[] = [
   'expired',
 ];
 
+export interface BuildReportOptions {
+  /** Source of coupons. Defaults to MongoDB; injectable for tests. */
+  load?: () => Promise<ICoupon[]>;
+}
+
 /** Reads current state from MongoDB and ranks it. Never mutates the database. */
-export async function buildReport(now: Date = new Date()): Promise<ReportSnapshot> {
-  const coupons = await getAllCoupons();
+export async function buildReport(
+  now: Date = new Date(),
+  options: BuildReportOptions = {},
+): Promise<ReportSnapshot> {
+  const coupons = await (options.load ?? getAllCoupons)();
   const ranked = rankCoupons(coupons, now);
 
   const groups = STATUS_ORDER.reduce<Record<CouponStatus, RankedCoupon[]>>(
@@ -353,8 +361,11 @@ function applicableAtTarget(entry: RankedCoupon): boolean {
  * Writes the four report files.
  * Failures are logged (with the likely fix) and never crash the scanner.
  */
-export async function writeReports(snapshot: ReportSnapshot): Promise<void> {
-  const directory = config.resultsDir;
+export async function writeReports(
+  snapshot: ReportSnapshot,
+  targetDirectory: string = config.resultsDir,
+): Promise<void> {
+  const directory = targetDirectory;
 
   try {
     await fs.mkdir(directory, { recursive: true });

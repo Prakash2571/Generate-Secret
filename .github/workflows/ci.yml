@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# A superseded run on the same branch is not worth the minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Type-check and test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # No lockfile is committed, so `npm ci` is not applicable.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type-check
+        run: npm run typecheck
+
+      # Tests never touch the network, MongoDB or a browser.
+      - name: Test
+        run: npm test
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free some disk space for Chromium
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android || true
+          df -h /
+
+      # Proves the multi-stage build works, including Chromium provisioning.
+      - name: Build image
+        run: docker build --tag shein-coupon-finder:ci .
+
+      - name: Verify the entry point and configuration guard
+        run: |
+          # With no MONGODB_URL the app must fail fast with a clear message
+          # rather than starting a scan.
+          output=$(docker run --rm --env MONGODB_URL= shein-coupon-finder:ci 2>&1 || true)
+          echo "$output"
+          echo "$output" | grep -q "MONGODB_URL is not set"
+
+  compose:
+    name: Compose file is valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose.yml
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          docker compose config --services | sort | tee /dev/stderr | grep -qx app

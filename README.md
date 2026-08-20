@@ -375,9 +375,47 @@ npm run build
 MONGODB_URL=mongodb://localhost:27017 npm start
 
 npm run typecheck          # types only
+npm test                   # compile + run the test suite
 RUN_ONCE=true npm start    # single cycle then exit
 REPORT_ONLY=true npm start # print stored state, no scanning
 ```
+
+## Tests
+
+```bash
+npm test          # compiles to dist-test/ then runs the suite
+npm run test:run  # re-run without recompiling
+```
+
+The suite uses Node's built-in test runner (`node --test`), so there is **no
+extra test dependency to install** and it works on Node 20 and 22. It runs
+offline in a couple of seconds: no network, no MongoDB and no browser is ever
+started.
+
+What is covered, and why it matters:
+
+| File | Locks down |
+| --- | --- |
+| `promotionParser.test.ts` | The accuracy rules: `UP TO 80% OFF SALE` is not an 80% coupon, `70% off up to ₹700` is a capped percentage, `₹800 off` is not tied to ₹1,000 unless published, cashback ≠ discount, expiry and restriction parsing |
+| `couponExtractor.test.ts` | Code detection vs. prose (`SHEIN`, `1000`, `use code at checkout` are not codes), snippet extraction, JSON-LD, per-page caps |
+| `discount.test.ts` | The ₹999–₹1999 ladder, caps, minimum-order refusal, `TARGET_MATCH` vs. `POTENTIAL_TARGET_MATCH` |
+| `confidence.test.ts` | Every point rule, the third-party cap, clamping to 0–100 |
+| `ranking.test.ts` | Validity first, then payable price; the "80% off max ₹300 loses to ₹600 off" case |
+| `couponRepository.test.ts` | Code normalisation, dedupe keys, conflict detection, expiry sweep, revalidation thresholds |
+| `couponValidator.test.ts` | The whole evidence cascade, including that third-party copies never reach `valid` |
+| `cartValidator.test.ts` | Response classification, and that a login/OTP/CAPTCHA wall is `blocked`, never a coupon verdict |
+| `reportService.test.ts` | Status groups never mixed, report wording, all four output files, CSV escaping |
+| `shutdown.test.ts` | Step order, failure isolation, per-step timeouts, idempotency |
+| `robots.test.ts`, `utils.test.ts` | robots.txt parsing, retry/backoff, concurrency limits, per-domain delay, table rendering |
+| `discoveryService.test.ts` | A broken collector cannot fail a scan; cross-source claims survive dedupe |
+
+The HTML-parsing suite in `couponExtractor.test.ts` skips itself with a clear
+reason if `cheerio` is not installed, so `npm test` is still meaningful before a
+full `npm install`.
+
+CI (`.github/workflows/ci.yml`) type-checks and tests on Node 20 and 22, builds
+the Docker image (proving Chromium provisioning works) and validates
+`docker-compose.yml`.
 
 ## Licence
 

@@ -5,7 +5,12 @@
 
 node_modules/
 dist/
+dist-test/
 *.tsbuildinfo
+
+# Compiled output must never sit next to the TypeScript sources
+src/**/*.js
+tests/**/*.js
 
 # Generated reports (directory itself is kept via results/.gitkeep)
 results/*
