@@ -20,8 +20,21 @@ const OFFICIAL_URLS = [
   'https://in.shein.com/promotion',
 ];
 
-/** Anchor text/href hints that suggest a promotional landing page. */
-const PROMO_LINK_HINT = /coupon|promo|offer|deal|sale|discount|new[-_ ]?user|campaign/i;
+/**
+ * Anchor text/href hints that suggest a coupon/promotion landing page.
+ *
+ * Deliberately narrow: bare "sale"/"offer"/"deal" used to match every category
+ * banner, so the crawler wandered into product listings (…-sc-…, /hotsale/,
+ * /recommend/) instead of coupon pages.
+ */
+const PROMO_LINK_HINT = /coupon|promo|voucher|new[-_ ]?user|first[-_ ]?order|campaign/i;
+
+/** URLs that look like category/product listings rather than coupon pages. */
+const NON_PROMO_URL = /-sc-|-p-|\/hotsale\/|\/recommend\/|\/sale\/|\/daily-new|\/goods|[?&](ici|adp|src_identifier)=/i;
+
+/** SHEIN India hosts. The crawler must never cross to us./ar./other markets. */
+const INDIA_HOSTS = new Set(['shein.in', 'www.shein.in', 'in.shein.com']);
+
 const MAX_DISCOVERED_LINKS = 4;
 
 /**
@@ -122,8 +135,10 @@ export function findPromoLinks(html: string, baseUrl: string): string[] {
         continue;
       }
       if (resolved.protocol !== 'https:') continue;
-      // Stay on SHEIN's own domains.
-      if (!/(^|\.)shein\.(in|com)$/i.test(resolved.hostname)) continue;
+      // India storefront only - never wander to us./ar./other SHEIN markets.
+      if (!INDIA_HOSTS.has(resolved.hostname.toLowerCase())) continue;
+      // Skip category/product listings that merely happen to match a hint word.
+      if (NON_PROMO_URL.test(resolved.pathname + resolved.search)) continue;
       resolved.hash = '';
       links.push(resolved.href);
     }
